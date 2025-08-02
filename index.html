@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Universal CCTV Viewer</title>
+  <style>
+    :root {
+      --bg: #111;
+      --fg: #eee;
+      --card: #222;
+      --btn: #4a90e2;
+      --btn-hover: #357ab8;
+      --danger: #e74c3c;
+      --success: #2ecc71;
+      --gap: 10px;
+    }
+    body { margin:0; font-family: Arial, sans-serif; background: var(--bg); color: var(--fg); }
+    header { background: var(--card); padding: var(--gap); display:flex; justify-content: space-between; align-items:center; }
+    header h1 { margin:0; color: var(--btn); font-size: 1.5rem; }
+    nav a { color: #fff; margin-left: 10px; text-decoration:none; font-weight:bold; }
+    nav a:hover { color: var(--btn); }
+    main { padding: var(--gap); }
+    .hidden { display:none; }
+    .controls, .feedback, .about-section { background: var(--card); padding: var(--gap); border-radius: 6px; margin-bottom: var(--gap); }
+    label { display:block; margin-bottom:4px; }
+    input, select, button { width:100%; padding:8px; margin-bottom: 6px; border:none; border-radius:4px; }
+    button { background: var(--btn); color:#fff; font-weight:bold; cursor:pointer; }
+    button:hover { background: var(--btn-hover); }
+    #grid { display:grid; gap: var(--gap); margin-top: var(--gap); }
+    .cell { position:relative; background:#000; border:1px solid #333; border-radius:4px; overflow:hidden; }
+    .cell img, .cell video { width:100%; height:100%; object-fit:cover; }
+    .cell-header { position:absolute; top:0; left:0; right:0; background:rgba(0,0,0,0.6); display:flex; justify-content:space-between; padding:4px; }
+    .cell-controls button { font-size:12px; padding:2px 5px; margin-left:3px; }
+    iframe { width:100%; height:300px; border:none; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>CCTV Viewer</h1>
+  <nav>
+    <a href="#" onclick="showTab('viewer')">Viewer</a>
+    <a href="#" onclick="showTab('profiles')">Profiles</a>
+    <a href="#" onclick="showTab('feedback')">Feedback</a>
+    <a href="#" onclick="showTab('about')">About</a>
+  </nav>
+</header>
+
+<main>
+  <!-- Viewer Page -->
+  <section id="viewer">
+    <div class="controls">
+      <h2>Add Camera</h2>
+      <label>Profile Name<input id="profileName" placeholder="e.g. Home"></label>
+      <label>DVR IP<input id="ip" placeholder="192.168.1.100"></label>
+      <label>Username<input id="user" placeholder="admin"></label>
+      <label>Password<input id="pass" type="password" placeholder="••••"></label>
+      <label>Camera #<input id="cam" type="number" min="1" value="1"></label>
+      <label>Stream Type
+        <select id="type">
+          <option value="mjpeg">MJPEG</option>
+          <option value="hls">HLS</option>
+          <option value="snapshot">Snapshot</option>
+          <option value="rtsp">RTSP (VLC only)</option>
+        </select>
+      </label>
+      <label>Snapshot Interval (sec)<input id="interval" type="number" min="1" value="5"></label>
+      <button onclick="addFeed()">Add to Grid</button>
+      <label>Rows<input id="rows" type="number" min="1" value="2"></label>
+      <label>Cols<input id="cols" type="number" min="1" value="2"></label>
+      <button onclick="buildGrid()">Apply Grid</button>
+    </div>
+    <div id="grid"></div>
+  </section>
+
+  <!-- Profiles Page -->
+  <section id="profiles" class="hidden">
+    <div class="controls">
+      <h2>Profiles & Config</h2>
+      <button onclick="saveProfile()">Save Profile</button>
+      <button onclick="loadProfile()">Load Profile</button>
+      <button onclick="exportConfig()">Export Config</button>
+      <input id="importInput" type="file" accept=".json" onchange="importConfig(event)">
+      <button onclick="clearGrid()">Clear Grid</button>
+    </div>
+  </section>
+
+  <!-- Feedback Page -->
+  <section id="feedback" class="hidden">
+    <div class="feedback">
+      <h2>Feedback & Suggestions</h2>
+      <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSc_SmFiKsTEl1vV7OFGM8FVlRpbipe2aenF7_ftPAsTaclqZA/viewform?embedded=true">Loading…</iframe>
+      <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSUvgoi4QRRUOksKa5X8giyyvBD3TBfOp1PMETOdz8rSK_0WtdH3MisgYE_IM1IIV438TDO39KrTqYt/pubhtml?widget=true&amp;headers=false"></iframe>
+    </div>
+  </section>
+
+  <!-- About Page -->
+  <section id="about" class="hidden">
+    <div class="about-section">
+      <h2>About This Tool</h2>
+      <p>This Universal CCTV Viewer helps users view MJPEG, HLS, RTSP, and Snapshot streams from multiple CCTV cameras directly in their browser without extra apps.</p>
+      <h3>Our Vision</h3>
+      <p>To simplify CCTV monitoring by creating a lightweight, universal, and user-friendly viewer for all users, including TV/STB users.</p>
+      <h3>Our Mission</h3>
+      <p>To empower homeowners, businesses, and property managers with a single interface for viewing and managing CCTV cameras without complex setups.</p>
+      <h3>Contact</h3>
+      <p>Email: support@example.com</p>
+    </div>
+  </section>
+</main>
+
+<script>
+  const grid = document.getElementById('grid');
+  const feeds = [];
+  const userField = id => document.getElementById(id);
+
+  function showTab(tab) {
+    document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
+    document.getElementById(tab).classList.remove('hidden');
+  }
+
+  function encode(v){return encodeURIComponent(v)}
+  function makeURL(f){
+    let u=f.user, p=encode(f.pass), ip=f.ip, c=f.cam, t=f.type;
+    if(t==='mjpeg') return `http://${ip}/cgi-bin/mjpg/video.cgi?user=${encode(u)}&pwd=${p}&channel=${c}&subtype=1`;
+    if(t==='hls') return `http://${ip}/live/ch00_${c}.m3u8`;
+    if(t==='snapshot') return `http://${ip}/cgi-bin/snapshot.cgi?user=${encode(u)}&pwd=${p}&channel=${c}`;
+    if(t==='rtsp') return `rtsp://${encode(u)}:${p}@${ip}:554/Streaming/Channels/${c}01`;
+  }
+
+  function addFeed() {
+    const f = {
+      name: userField('profileName').value || 'Cam'+(feeds.length+1),
+      ip: userField('ip').value,
+      user: userField('user').value,
+      pass: userField('pass').value,
+      cam: userField('cam').value,
+      type: userField('type').value,
+      interval: +userField('interval').value
+    };
+    feeds.push(f);
+    buildGrid();
+  }
+
+  function buildGrid() {
+    let r = +userField('rows').value, c = +userField('cols').value;
+    grid.style.gridTemplateRows = `repeat(${r},1fr)`;
+    grid.style.gridTemplateColumns = `repeat(${c},1fr)`;
+    renderFeeds();
+  }
+
+  function renderFeeds() {
+    grid.innerHTML = '';
+    feeds.forEach((f,i) => {
+      const url = makeURL(f);
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+
+      const header = document.createElement('div');
+      header.className = 'cell-header';
+      header.innerHTML = `
+        <span>${f.name}</span>
+        <div class="cell-controls">
+          <button onclick="window.open('${url}','_blank')">Open</button>
+          <button onclick="navigator.clipboard.writeText('${url}')">Copy</button>
+          <button onclick="toggleFullscreen(this)">Fullscreen</button>
+          <img src="https://chart.googleapis.com/chart?chs=100x100&cht=qr&chl=${encode(url)}" width="30">
+        </div>`;
+      cell.appendChild(header);
+
+      if(f.type==='rtsp'){
+        const msg=document.createElement('div');
+        msg.style="color:#fff;text-align:center;padding:20px;";
+        msg.innerText="RTSP feed. Open in VLC.";
+        cell.appendChild(msg);
+      } else if(f.type==='hls'){
+        const v=document.createElement('video');
+        v.src=url; v.autoplay=v.controls=true; v.muted=true;
+        cell.appendChild(v);
+      } else {
+        const img=document.createElement('img');
+        img.src=url;
+        cell.appendChild(img);
+        if(f.type==='snapshot'){
+          setInterval(()=>img.src=makeURL(f)+'&_ts='+Date.now(), f.interval*1000);
+        }
+      }
+      grid.appendChild(cell);
+    });
+  }
+
+  function toggleFullscreen(btn) {
+    const cell = btn.closest('.cell');
+    if (cell.requestFullscreen) cell.requestFullscreen();
+  }
+
+  function saveProfile() {
+    const profile = JSON.stringify(feeds);
+    localStorage.setItem('cctvProfiles', profile);
+    alert('Profile saved!');
+  }
+  function loadProfile() {
+    const profile = localStorage.getItem('cctvProfiles');
+    if (profile) { feeds.length=0; feeds.push(...JSON.parse(profile)); buildGrid(); alert('Profile loaded!'); }
+  }
+  function exportConfig() {
+    const data=JSON.stringify(feeds,null,2);
+    const blob=new Blob([data],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='cctv_profiles.json'; a.click();
+  }
+  function importConfig(e) {
+    const file=e.target.files[0];
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=r=>{
+      try{feeds.length=0;feeds.push(...JSON.parse(r.target.result));buildGrid();}
+      catch{alert('Invalid JSON')}
+    };
+    reader.readAsText(file);
+  }
+  function clearGrid() {
+    feeds.length=0; renderFeeds();
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+      buildGrid();
+  });
+
+  document.addEventListener('keydown', function(e) {
+      if(e.key === 'Escape' && document.fullscreenElement) {
+          document.exitFullscreen();
+      }
+  });
+</script>
+</body>
+</html>
