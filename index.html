@@ -1,238 +1,180 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Universal CCTV Viewer</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CCTV Viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root {
-      --bg: #111;
-      --fg: #eee;
-      --card: #222;
-      --btn: #4a90e2;
-      --btn-hover: #357ab8;
-      --danger: #e74c3c;
-      --success: #2ecc71;
-      --gap: 10px;
+    .fade-in { opacity: 0; transform: translateY(10px); animation: fadeIn 0.6s ease-out forwards; }
+    @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+    .btn-animate { transition: transform 0.2s ease, background 0.3s ease; }
+    .btn-animate:hover { transform: scale(1.05); }
+    .bg-animated {
+      background: linear-gradient(-45deg, #1e3a8a, #9333ea, #0ea5e9, #14b8a6);
+      background-size: 400% 400%;
+      animation: gradientBG 12s ease infinite;
     }
-    body { margin:0; font-family: Arial, sans-serif; background: var(--bg); color: var(--fg); }
-    header { background: var(--card); padding: var(--gap); display:flex; justify-content: space-between; align-items:center; }
-    header h1 { margin:0; color: var(--btn); font-size: 1.5rem; }
-    nav a { color: #fff; margin-left: 10px; text-decoration:none; font-weight:bold; }
-    nav a:hover { color: var(--btn); }
-    main { padding: var(--gap); }
-    .hidden { display:none; }
-    .controls, .feedback, .about-section { background: var(--card); padding: var(--gap); border-radius: 6px; margin-bottom: var(--gap); }
-    label { display:block; margin-bottom:4px; }
-    input, select, button { width:100%; padding:8px; margin-bottom: 6px; border:none; border-radius:4px; }
-    button { background: var(--btn); color:#fff; font-weight:bold; cursor:pointer; }
-    button:hover { background: var(--btn-hover); }
-    #grid { display:grid; gap: var(--gap); margin-top: var(--gap); }
-    .cell { position:relative; background:#000; border:1px solid #333; border-radius:4px; overflow:hidden; }
-    .cell img, .cell video { width:100%; height:100%; object-fit:cover; }
-    .cell-header { position:absolute; top:0; left:0; right:0; background:rgba(0,0,0,0.6); display:flex; justify-content:space-between; padding:4px; }
-    .cell-controls button { font-size:12px; padding:2px 5px; margin-left:3px; }
-    iframe { width:100%; height:300px; border:none; }
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    #qrModal {
+      display: none;
+    }
   </style>
 </head>
-<body>
-<header>
-  <h1>CCTV Viewer</h1>
-  <nav>
-    <a href="#" onclick="showTab('viewer')">Viewer</a>
-    <a href="#" onclick="showTab('profiles')">Profiles</a>
-    <a href="#" onclick="showTab('feedback')">Feedback</a>
-    <a href="#" onclick="showTab('about')">About</a>
-  </nav>
-</header>
+<body class="bg-gray-900 text-white min-h-screen">
 
-<main>
-  <!-- Viewer Page -->
-  <section id="viewer">
-    <div class="controls">
-      <h2>Add Camera</h2>
-      <label>Profile Name<input id="profileName" placeholder="e.g. Home"></label>
-      <label>DVR IP<input id="ip" placeholder="192.168.1.100"></label>
-      <label>Username<input id="user" placeholder="admin"></label>
-      <label>Password<input id="pass" type="password" placeholder="••••"></label>
-      <label>Camera #<input id="cam" type="number" min="1" value="1"></label>
-      <label>Stream Type
-        <select id="type">
-          <option value="mjpeg">MJPEG</option>
-          <option value="hls">HLS</option>
-          <option value="snapshot">Snapshot</option>
-          <option value="rtsp">RTSP (VLC only)</option>
-        </select>
-      </label>
-      <label>Snapshot Interval (sec)<input id="interval" type="number" min="1" value="5"></label>
-      <button onclick="addFeed()">Add to Grid</button>
-      <label>Rows<input id="rows" type="number" min="1" value="2"></label>
-      <label>Cols<input id="cols" type="number" min="1" value="2"></label>
-      <button onclick="buildGrid()">Apply Grid</button>
-    </div>
-    <div id="grid"></div>
-  </section>
+  <!-- Landing Page -->
+  <section id="landing" class="bg-animated text-center text-white">
+    <header class="flex justify-between items-center p-6">
+      <h1 class="text-2xl font-bold">CCTV Viewer</h1>
+      <nav class="space-x-6">
+        <button onclick="showPage('viewer')" class="hover:text-blue-300">Viewer</button>
+        <button onclick="showPage('profiles')" class="hover:text-blue-300">Profiles</button>
+        <button onclick="showPage('feedback')" class="hover:text-blue-300">Feedback</button>
+        <button onclick="showPage('about')" class="hover:text-blue-300">About</button>
+        <button onclick="showPage('faq')" class="hover:text-blue-300">FAQ</button>
+      </nav>
+    </header>
 
-  <!-- Profiles Page -->
-  <section id="profiles" class="hidden">
-    <div class="controls">
-      <h2>Profiles & Config</h2>
-      <button onclick="saveProfile()">Save Profile</button>
-      <button onclick="loadProfile()">Load Profile</button>
-      <button onclick="exportConfig()">Export Config</button>
-      <input id="importInput" type="file" accept=".json" onchange="importConfig(event)">
-      <button onclick="clearGrid()">Clear Grid</button>
+    <!-- Hero -->
+    <div class="flex flex-col items-center justify-center min-h-[70vh] space-y-6 p-6">
+      <img src="https://cdn-icons-png.flaticon.com/512/3064/3064197.png" class="w-28 h-28 animate-bounce" />
+      <h2 class="text-4xl md:text-5xl font-bold fade-in">Universal CCTV Viewer</h2>
+      <p class="text-lg max-w-xl text-gray-200 fade-in">Monitor all your cameras in one place. Works on TV/STB browsers. Supports Hikvision, CP Plus, Dahua & more.</p>
+      <div class="space-x-4 fade-in">
+        <button onclick="showPage('viewer')" class="bg-blue-500 px-6 py-3 rounded btn-animate">Start Viewing</button>
+        <button onclick="showPage('feedback')" class="bg-green-500 px-6 py-3 rounded btn-animate">Give Feedback</button>
+      </div>
     </div>
   </section>
 
-  <!-- Feedback Page -->
-  <section id="feedback" class="hidden">
-    <div class="feedback">
-      <h2>Feedback & Suggestions</h2>
-      <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSc_SmFiKsTEl1vV7OFGM8FVlRpbipe2aenF7_ftPAsTaclqZA/viewform?embedded=true">Loading…</iframe>
-      <iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSUvgoi4QRRUOksKa5X8giyyvBD3TBfOp1PMETOdz8rSK_0WtdH3MisgYE_IM1IIV438TDO39KrTqYt/pubhtml?widget=true&amp;headers=false"></iframe>
+  <!-- Main App -->
+  <header id="main-header" class="hidden bg-gray-800 shadow-md p-4 flex justify-between items-center">
+    <h1 class="text-2xl font-bold text-blue-400">CCTV Viewer</h1>
+    <nav class="space-x-4">
+      <button onclick="showTab('viewer')" class="hover:text-blue-400">Viewer</button>
+      <button onclick="showTab('profiles')" class="hover:text-blue-400">Profiles</button>
+      <button onclick="showTab('feedback')" class="hover:text-blue-400">Feedback</button>
+      <button onclick="showTab('about')" class="hover:text-blue-400">About</button>
+      <button onclick="showTab('faq')" class="hover:text-blue-400">FAQ</button>
+    </nav>
+  </header>
+
+  <main id="main-app" class="hidden p-4 space-y-6">
+
+    <!-- Viewer Section -->
+    <section id="viewer" class="space-y-4 fade-in">
+      <div class="flex justify-between items-center">
+        <h2 class="text-xl font-bold">📹 CCTV Viewer</h2>
+        <button onclick="showTab('feedback')" class="bg-green-500 px-3 py-2 rounded btn-animate">💬 Feedback</button>
+      </div>
+
+      <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+        <div class="grid md:grid-cols-2 gap-4">
+          <input id="profileName" placeholder="Profile Name" class="p-2 rounded bg-gray-700" />
+          <input id="ip" placeholder="DVR IP" class="p-2 rounded bg-gray-700" />
+          <input id="user" placeholder="Username" class="p-2 rounded bg-gray-700" />
+          <input id="pass" type="password" placeholder="Password" class="p-2 rounded bg-gray-700" />
+          <input id="cam" type="number" value="1" class="p-2 rounded bg-gray-700" />
+          <select id="type" class="p-2 rounded bg-gray-700">
+            <option value="mjpeg">MJPEG</option>
+            <option value="hls">HLS</option>
+            <option value="snapshot">Snapshot</option>
+            <option value="rtsp">RTSP (VLC only)</option>
+          </select>
+          <input id="interval" type="number" value="5" class="p-2 rounded bg-gray-700" />
+        </div>
+        <div class="mt-4 flex gap-3">
+          <button onclick="addFeed()" class="bg-blue-500 px-4 py-2 rounded btn-animate">Add to Grid</button>
+          <button onclick="buildGrid()" class="bg-green-500 px-4 py-2 rounded btn-animate">Apply Grid</button>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-3">
+          <input id="rows" type="number" value="2" class="p-2 rounded bg-gray-700" />
+          <input id="cols" type="number" value="2" class="p-2 rounded bg-gray-700" />
+        </div>
+      </div>
+      <div id="grid" class="grid gap-4"></div>
+    </section>
+
+    <!-- Profiles -->
+    <section id="profiles" class="hidden fade-in">
+      <div class="bg-gray-800 p-4 rounded-lg shadow-lg space-y-3">
+        <button onclick="saveProfile()" class="bg-green-500 px-4 py-2 rounded btn-animate">Save Profile</button>
+        <button onclick="loadProfile()" class="bg-yellow-500 px-4 py-2 rounded btn-animate">Load Profile</button>
+        <button onclick="exportConfig()" class="bg-blue-500 px-4 py-2 rounded btn-animate">Export Config</button>
+        <input id="importInput" type="file" accept=".json" onchange="importConfig(event)" class="block mt-2" />
+        <button onclick="clearGrid()" class="bg-red-500 px-4 py-2 rounded btn-animate">Clear Grid</button>
+      </div>
+    </section>
+
+    <!-- Feedback -->
+    <section id="feedback" class="hidden fade-in">
+      <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+        <h2 class="text-2xl font-bold mb-3 text-green-400">💬 Feedback & Suggestions</h2>
+        <iframe class="w-full h-72 rounded" src="https://docs.google.com/forms/d/e/1FAIpQLSc_SmFiKsTEl1vV7OFGM8FVlRpbipe2aenF7_ftPAsTaclqZA/viewform?embedded=true"></iframe>
+        <iframe class="w-full h-72 rounded mt-4" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSUvgoi4QRRUOksKa5X8giyyvBD3TBfOp1PMETOdz8rSK_0WtdH3MisgYE_IM1IIV438TDO39KrTqYt/pubhtml?widget=true&amp;headers=false"></iframe>
+      </div>
+    </section>
+
+    <!-- About -->
+    <section id="about" class="hidden fade-in">
+      <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+        <h2 class="text-xl font-bold">About</h2>
+        <p>This tool generates MJPEG, HLS, Snapshot, and RTSP links for your cameras. Works on TV/STB browsers.</p>
+        <p><strong>Contact:</strong> surisetti.dev@gmail.com</p>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section id="faq" class="hidden fade-in">
+      <div class="bg-gray-800 p-4 rounded-lg shadow-lg">
+        <h2 class="text-xl font-bold">FAQ</h2>
+        <p><strong>Q:</strong> Can I use this outside LAN?<br><strong>A:</strong> Only if DVR/NVR supports remote access.</p>
+        <p><strong>Q:</strong> Does RTSP play inline?<br><strong>A:</strong> No, open it in VLC or similar player.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- QR Code Modal -->
+  <div id="qrModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center">
+    <div class="bg-white p-4 rounded text-black relative">
+      <button onclick="closeQR()" class="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded">X</button>
+      <h2 class="text-lg font-bold mb-2">Scan QR Code</h2>
+      <img id="qrImage" src="" alt="QR Code" class="mx-auto" />
     </div>
-  </section>
+  </div>
 
-  <!-- About Page -->
-  <section id="about" class="hidden">
-    <div class="about-section">
-      <h2>About This Tool</h2>
-      <p>This Universal CCTV Viewer helps users view MJPEG, HLS, RTSP, and Snapshot streams from multiple CCTV cameras directly in their browser without extra apps.</p>
-      <h3>Our Vision</h3>
-      <p>To simplify CCTV monitoring by creating a lightweight, universal, and user-friendly viewer for all users, including TV/STB users.</p>
-      <h3>Our Mission</h3>
-      <p>To empower homeowners, businesses, and property managers with a single interface for viewing and managing CCTV cameras without complex setups.</p>
-      <h3>Contact</h3>
-      <p>Email: support@example.com</p>
-    </div>
-  </section>
-</main>
-
-<script>
-  const grid = document.getElementById('grid');
-  const feeds = [];
-  const userField = id => document.getElementById(id);
-
-  function showTab(tab) {
-    document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
-    document.getElementById(tab).classList.remove('hidden');
-  }
-
-  function encode(v){return encodeURIComponent(v)}
-  function makeURL(f){
-    let u=f.user, p=encode(f.pass), ip=f.ip, c=f.cam, t=f.type;
-    if(t==='mjpeg') return `http://${ip}/cgi-bin/mjpg/video.cgi?user=${encode(u)}&pwd=${p}&channel=${c}&subtype=1`;
-    if(t==='hls') return `http://${ip}/live/ch00_${c}.m3u8`;
-    if(t==='snapshot') return `http://${ip}/cgi-bin/snapshot.cgi?user=${encode(u)}&pwd=${p}&channel=${c}`;
-    if(t==='rtsp') return `rtsp://${encode(u)}:${p}@${ip}:554/Streaming/Channels/${c}01`;
-  }
-
-  function addFeed() {
-    const f = {
-      name: userField('profileName').value || 'Cam'+(feeds.length+1),
-      ip: userField('ip').value,
-      user: userField('user').value,
-      pass: userField('pass').value,
-      cam: userField('cam').value,
-      type: userField('type').value,
-      interval: +userField('interval').value
-    };
-    feeds.push(f);
-    buildGrid();
-  }
-
-  function buildGrid() {
-    let r = +userField('rows').value, c = +userField('cols').value;
-    grid.style.gridTemplateRows = `repeat(${r},1fr)`;
-    grid.style.gridTemplateColumns = `repeat(${c},1fr)`;
-    renderFeeds();
-  }
-
-  function renderFeeds() {
-    grid.innerHTML = '';
-    feeds.forEach((f,i) => {
-      const url = makeURL(f);
-      const cell = document.createElement('div');
-      cell.className = 'cell';
-
-      const header = document.createElement('div');
-      header.className = 'cell-header';
-      header.innerHTML = `
-        <span>${f.name}</span>
-        <div class="cell-controls">
-          <button onclick="window.open('${url}','_blank')">Open</button>
-          <button onclick="navigator.clipboard.writeText('${url}')">Copy</button>
-          <button onclick="toggleFullscreen(this)">Fullscreen</button>
-          <img src="https://chart.googleapis.com/chart?chs=100x100&cht=qr&chl=${encode(url)}" width="30">
-        </div>`;
-      cell.appendChild(header);
-
-      if(f.type==='rtsp'){
-        const msg=document.createElement('div');
-        msg.style="color:#fff;text-align:center;padding:20px;";
-        msg.innerText="RTSP feed. Open in VLC.";
-        cell.appendChild(msg);
-      } else if(f.type==='hls'){
-        const v=document.createElement('video');
-        v.src=url; v.autoplay=v.controls=true; v.muted=true;
-        cell.appendChild(v);
-      } else {
-        const img=document.createElement('img');
-        img.src=url;
-        cell.appendChild(img);
-        if(f.type==='snapshot'){
-          setInterval(()=>img.src=makeURL(f)+'&_ts='+Date.now(), f.interval*1000);
-        }
-      }
-      grid.appendChild(cell);
-    });
-  }
-
-  function toggleFullscreen(btn) {
-    const cell = btn.closest('.cell');
-    if (cell.requestFullscreen) cell.requestFullscreen();
-  }
-
-  function saveProfile() {
-    const profile = JSON.stringify(feeds);
-    localStorage.setItem('cctvProfiles', profile);
-    alert('Profile saved!');
-  }
-  function loadProfile() {
-    const profile = localStorage.getItem('cctvProfiles');
-    if (profile) { feeds.length=0; feeds.push(...JSON.parse(profile)); buildGrid(); alert('Profile loaded!'); }
-  }
-  function exportConfig() {
-    const data=JSON.stringify(feeds,null,2);
-    const blob=new Blob([data],{type:'application/json'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url; a.download='cctv_profiles.json'; a.click();
-  }
-  function importConfig(e) {
-    const file=e.target.files[0];
-    if(!file) return;
-    const reader=new FileReader();
-    reader.onload=r=>{
-      try{feeds.length=0;feeds.push(...JSON.parse(r.target.result));buildGrid();}
-      catch{alert('Invalid JSON')}
-    };
-    reader.readAsText(file);
-  }
-  function clearGrid() {
-    feeds.length=0; renderFeeds();
-  }
-
-  document.addEventListener('DOMContentLoaded', function() {
-      buildGrid();
-  });
-
-  document.addEventListener('keydown', function(e) {
-      if(e.key === 'Escape' && document.fullscreenElement) {
-          document.exitFullscreen();
-      }
-  });
-</script>
+  <script>
+    const grid=document.getElementById("grid"),feeds=[];
+    function showPage(p){document.getElementById("landing").classList.add("hidden");document.getElementById("main-header").classList.remove("hidden");document.getElementById("main-app").classList.remove("hidden");showTab(p);}
+    function showTab(t){document.querySelectorAll("#main-app section").forEach(s=>s.classList.add("hidden"));document.getElementById(t).classList.remove("hidden");}
+    function encode(v){return encodeURIComponent(v);}
+    function makeURL(f){let u=f.user,p=encode(f.pass),ip=f.ip,c=f.cam,t=f.type;
+      if(t==="mjpeg")return`http://${ip}/cgi-bin/mjpg/video.cgi?user=${encode(u)}&pwd=${p}&channel=${c}&subtype=1`;
+      if(t==="hls")return`http://${ip}/live/ch00_${c}.m3u8`;
+      if(t==="snapshot")return`http://${ip}/cgi-bin/snapshot.cgi?user=${encode(u)}&pwd=${p}&channel=${c}`;
+      if(t==="rtsp")return`rtsp://${encode(u)}:${p}@${ip}:554/Streaming/Channels/${c}01`;}
+    function addFeed(){const f={name:profileName.value||"Cam"+(feeds.length+1),ip:ip.value,user:user.value,pass:pass.value,cam:cam.value,type:type.value,interval:+interval.value};feeds.push(f);buildGrid();}
+    function buildGrid(){grid.style.gridTemplateRows=`repeat(${rows.value},1fr)`;grid.style.gridTemplateColumns=`repeat(${cols.value},1fr)`;renderFeeds();}
+    function renderFeeds(){grid.innerHTML="";feeds.forEach(f=>{const url=makeURL(f);const cell=document.createElement("div");cell.className="bg-black rounded p-2";cell.innerHTML=`<div class='flex justify-between mb-2'><span>${f.name}</span>
+      <div class='space-x-2'>
+        <button onclick="window.open('${url}','_blank')" class="bg-blue-500 px-2 py-1 rounded text-xs">Open</button>
+        <button onclick="navigator.clipboard.writeText('${url}')" class="bg-gray-500 px-2 py-1 rounded text-xs">Copy</button>
+        <button onclick="showQR('${url}')" class="bg-green-500 px-2 py-1 rounded text-xs">QR</button>
+      </div></div>`;
+      if(f.type==="rtsp"){cell.innerHTML+=`<p class='text-white p-2'>RTSP feed. Open in VLC.</p>`;}else if(f.type==="hls"){cell.innerHTML+=`<video src="${url}" autoplay controls muted></video>`;}else{cell.innerHTML+=`<img src="${url}" />`;}
+      grid.appendChild(cell);});}
+    function saveProfile(){localStorage.setItem("cctvProfiles",JSON.stringify(feeds));alert("Profile saved!");}
+    function loadProfile(){const p=localStorage.getItem("cctvProfiles");if(p){feeds.length=0;feeds.push(...JSON.parse(p));buildGrid();}}
+    function exportConfig(){const blob=new Blob([JSON.stringify(feeds,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="cctv_profiles.json";a.click();}
+    function importConfig(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=x=>{feeds.length=0;feeds.push(...JSON.parse(x.target.result));buildGrid();};r.readAsText(f);}
+    function clearGrid(){feeds.length=0;buildGrid();}
+    function showQR(url){document.getElementById("qrImage").src=`https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(url)}`;document.getElementById("qrModal").style.display="flex";}
+    function closeQR(){document.getElementById("qrModal").style.display="none";}
+  </script>
 </body>
 </html>
